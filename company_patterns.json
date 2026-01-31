@@ -1,0 +1,38 @@
+{
+  "inseego.com": ["firstlast", "first"],
+  "google.com": ["first.last", "first"],
+  "commercetools.com": ["first.last", "first"],
+  "zuora.com": ["flast", "first.last"],
+  "zscaler.com": ["flast", "first.last"],
+  "zillow.com": ["firstlast", "flast"],
+  "zerto.com": ["first.last", "first"],
+  "worldsurfleague.com": ["flast", "firstlast"],
+  "wandisco.com": ["first.last", "first"],
+  "vultr.com": ["flast", "first.last"],
+  "vlocity.com": ["flast", "first"],
+  "vmem.com": ["flast", "first.last"],
+
+  "verizon.com": ["first.last", "first"],
+  "veritas.com": ["first.last", "flast"],
+  "veeam.com": ["first.last", "flast"],
+  "varonis.com": ["flast", "first"],
+  "vmware.com": ["flast", "first.last"],
+  "uniphore.com": ["first.last", "first"],
+  "uipath.com": ["first.last", "first"],
+
+  "typeface.ai": ["first", "first.last"],
+  "twilio.com": ["flast", "first.last"],
+  "turbonomic.com": ["first.last", "first_last"],
+  "acoustic.co": ["first.last", "flast"],
+  "acronis.com": ["first.last", "first_last"],
+  "actifio.com": ["first.last", "first"],
+  "auditboard.com": ["flast", "first.last"],
+  "cohesity.com": ["first.last", "flast"],
+  "dell.com": ["first.last", "first_last"],
+  "groq.com": ["flast", "first"],
+
+  "hpe.com": ["first.last", "flast"],
+  "ifsworld.com": ["first.last", "first"],
+  "infineon.com": ["first.last", "first"],
+  "intel.in": ["flast", "firstlast"]
+}
