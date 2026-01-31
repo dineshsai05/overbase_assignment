@@ -1,51 +1,120 @@
 import pandas as pd
 import re
 import dns.resolver
-from concurrent.futures import ThreadPoolExecutor
+from googlesearch import search
+from urllib.parse import urlparse
+import time
 
-# 1. Load your existing filtered data
-df = pd.read_csv('filtered_data.csv')
+# ---------------- CONFIG ---------------- #
 
-def get_heuristic_domain(company_name):
-    """Cleans company name to a likely domain string."""
-    c = str(company_name).lower().strip()
-    # Remove corporate suffixes
-    suffixes = r'\b(inc|corp|ltd|llc|group|solutions|networks|systems|company|the|intl)\b'
-    c = re.sub(suffixes, '', c)
-    # Remove non-alphanumeric characters
-    c = re.sub(r'[^a-z0-9]', '', c)
-    return f"{c}.com" if c else "company.com"
+resolver = dns.resolver.Resolver()
+resolver.nameservers = ['8.8.8.8', '8.8.4.4']
+resolver.timeout = 5
+resolver.lifetime = 5
+
+CORP_KEYWORDS = [
+    "inc", "corp", "ltd", "llc", "limited", "company", "co",
+    "technologies", "technology", "systems", "solutions",
+    "group", "holdings", "networks", "industries"
+]
+
+# ---------------- HELPERS ---------------- #
+
+def extract_company(raw):
+    """
+    Extract the most likely company name from messy lead strings.
+    """
+    if pd.isna(raw):
+        return None
+
+    raw = str(raw).strip()
+
+    # Split on commas
+    parts = [p.strip() for p in raw.split(',') if p.strip()]
+
+    # Prefer part with corporate keywords
+    for part in reversed(parts):
+        if any(k in part.lower() for k in CORP_KEYWORDS):
+            return part
+
+    # Otherwise assume last segment is company
+    return parts[-1] if parts else raw
+
+
+def normalize_company(name):
+    """
+    Normalize company name for search.
+    """
+    name = name.lower()
+    name = re.sub(r'\b(' + '|'.join(CORP_KEYWORDS) + r')\b', '', name)
+    name = re.sub(r'[^a-z0-9 ]', ' ', name)
+    return re.sub(r'\s+', ' ', name).strip()
+
 
 def check_mx(domain):
-    """Verifies if the domain has valid Mail Exchange records."""
+    """
+    Check MX records.
+    """
     try:
-        # We set a timeout so the script doesn't hang on dead domains
-        answers = dns.resolver.resolve(domain, 'MX', timeout=2)
-        return True if answers else False
+        answers = resolver.resolve(domain, 'MX')
+        return bool(answers)
     except:
         return False
 
-def process_row(company):
-    """Logic to find and verify the domain."""
-    # First, guess the domain
-    domain = get_heuristic_domain(company)
-    
-    # Second, check if it's valid. If not, try common variations (like .io or .net)
-    if not check_mx(domain):
-        # Specific check for tech startups in your list (like Spacelift or Honeycomb)
-        for ext in ['.io', '.ai', '.net']:
-            alt_domain = domain.replace('.com', ext)
-            if check_mx(alt_domain):
-                return alt_domain
-    
-    return domain
 
-# 2. Apply the logic
-# We use a ThreadPoolExecutor to make the DNS checks much faster
-print("Starting Domain Discovery and MX Validation...")
-with ThreadPoolExecutor(max_workers=10) as executor:
-    df['Domain'] = list(executor.map(process_row, df['Company']))
+def google_domain(company):
+    """
+    Search Google and return top domain.
+    """
+    query = f"{company} official website"
+    try:
+        for url in search(query, stop=1, pause=2):
+            domain = urlparse(url).netloc.lower()
+            domain = domain.replace("www.", "")
+            return domain
+    except:
+        return None
 
-# 3. Final Export
-df.to_csv('data_with_domains.csv', index=False)
-print("Done! Domains added and verified in 'data_with_domains.csv'")
+
+# ---------------- CORE LOGIC ---------------- #
+
+def discover_domain(raw_company):
+    print(f"🔍 {raw_company}")
+
+    company = extract_company(raw_company)
+    if not company or len(company) < 3:
+        return "manual_check_required"
+
+    clean = normalize_company(company)
+
+    # --- Step 1: Google search (primary truth source) ---
+    domain = google_domain(company)
+    if domain:
+        if check_mx(domain):
+            print(f"✅ Google + MX: {domain}")
+            return domain
+        else:
+            # Google result but MX failed → still keep
+            print(f"⚠️ Google only: {domain}")
+            return domain
+
+    # --- Step 2: Heuristic fallback ---
+    fallback = clean.replace(" ", "") + ".com"
+    if check_mx(fallback):
+        print(f"✅ Heuristic MX: {fallback}")
+        return fallback
+
+   
+    print(f"❌ Manual required")
+    return "manual_check_required"
+
+
+
+df = pd.read_csv("filtered_data.csv")
+
+df["Domain"] = df["Company"].apply(discover_domain)
+
+df = df[df["Domain"] != "manual_check_required"]
+
+
+df.to_csv("data_with_domains.csv", index=False)
